@@ -1,0 +1,60 @@
+data_dir: ./data
+log_level: INFO
+
+ssh:
+  enabled: true
+  bind: 0.0.0.0
+  port: 2222
+  banner: "SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.6"
+  hostname: "srv-prod-02"
+  accept_after_failures: 4
+  weak_passwords:
+    - "123456"
+    - password
+    - admin
+    - root
+    - toor
+    - "12345678"
+  max_connections: 100
+  max_per_ip: 5
+  session_timeout_s: 300
+  idle_timeout_s: 60
+  max_commands: 50
+
+http:
+  enabled: true
+  bind: 0.0.0.0
+  port: 8080
+  server_header: "Apache/2.4.41 (Ubuntu)"
+  max_body_bytes: 8192
+
+rules:
+  directory: ./rules
+  reload_on_sighup: true
+
+enrichment:
+  geoip_city_db: ./data/geo/GeoLite2-City.mmdb
+  geoip_asn_db: ./data/geo/GeoLite2-ASN.mmdb
+
+scoring:
+  half_life_hours: 6
+  weights:
+    info: 1
+    low: 3
+    medium: 8
+    high: 20
+    critical: 40
+
+alerts:
+  telegram:
+    enabled: false
+    token_env: HONEYWATCH_TG_TOKEN
+    chat_id: ""
+    min_severity: high
+    max_per_hour: 20
+
+storage:
+  retention_days: 30
+  queue_size: 10000
+  raw_archive: true
+  compress_after_days: 7
