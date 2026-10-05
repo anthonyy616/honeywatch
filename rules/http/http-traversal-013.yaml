@@ -1,0 +1,15 @@
+id: http-traversal-013
+title: Path traversal attempt
+description: Directory traversal sequences, encoded traversal or local file inclusion probes.
+attack: T1190
+attack_name: Exploit Public-Facing Application
+severity: high
+enabled: true
+match:
+  service: http
+match_any:
+  - path|re: '(\.\./\.\./|%2e%2e%2f|%252e%252e%2f|\.\.%2f|php://(filter|input)|file=/etc/(passwd|shadow))'
+  - query|re: '(\.\./\.\./|%2e%2e%2f|%252e%252e%2f|\.\.%2f|php://(filter|input)|file=/etc/(passwd|shadow))'
+  - body_snippet|re: '(\.\./\.\./|%2e%2e%2f|%252e%252e%2f|\.\.%2f|php://(filter|input)|file=/etc/(passwd|shadow))'
+tags: [web-exploit]
+alert: true

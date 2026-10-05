@@ -1,0 +1,21 @@
+id: ssh-persistence-007
+title: Persistence mechanism intent
+description: Command references authorized_keys, crontab, rc.local, init scripts or shell profile edits.
+attack: T1098.004
+attack_name: SSH Authorized Keys
+severity: high
+enabled: true
+match:
+  service: ssh
+  event_type: command
+  command|contains:
+    - authorized_keys
+    - crontab
+    - rc.local
+    - /etc/init.d
+    - systemctl enable
+    - .bashrc
+    - .bash_profile
+    - chkconfig
+tags: [persistence, post-compromise]
+alert: true

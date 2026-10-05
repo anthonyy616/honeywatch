@@ -1,0 +1,16 @@
+id: http-login-brute-012
+title: HTTP login brute force
+description: Ten or more login POSTs from one source IP within 60 seconds.
+attack: T1110
+attack_name: Brute Force
+severity: high
+enabled: true
+match:
+  service: http
+  event_type: http_login_attempt
+threshold:
+  group_by: src_ip
+  count: 10
+  window: 60s
+tags: [brute-force, credential-access]
+alert: true

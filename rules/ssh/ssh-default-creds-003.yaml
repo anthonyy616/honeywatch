@@ -1,0 +1,14 @@
+id: ssh-default-creds-003
+title: Default or common credentials attempted
+description: A default username paired with a very common password, even if no threshold is met.
+attack: T1078.001
+attack_name: Default Accounts
+severity: low
+enabled: true
+match:
+  service: ssh
+  event_type: login_attempt
+  username|re: '^(root|admin|user|test|guest|ubuntu|pi|oracle|mysql|nobody|ftp)$'
+  password|re: '^(123456|password|admin|root|toor|12345678|qwerty|abc123|letmein|welcome|changeme|default|1234)$'
+tags: [default-credentials, credential-access]
+alert: false

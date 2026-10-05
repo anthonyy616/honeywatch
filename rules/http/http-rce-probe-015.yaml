@@ -1,0 +1,15 @@
+id: http-rce-probe-015
+title: Remote code execution probe
+description: Requests attempting command execution, webshell droppers or framework RCE exploitation.
+attack: T1190
+attack_name: Exploit Public-Facing Application
+severity: critical
+enabled: true
+match:
+  service: http
+match_any:
+  - path|re: '(/bin/sh|/bin/bash|/cgi-bin|eval-stdin|invokefunction|passthru|shell_exec|system\(|assert\(|base64_decode\(|powershell|cmd\.exe)'
+  - query|re: '(/bin/sh|/bin/bash|eval-stdin|invokefunction|passthru|shell_exec|system\(|powershell|cmd\.exe)'
+  - body_snippet|re: '(/bin/sh|/bin/bash|eval-stdin|invokefunction|passthru|shell_exec|system\(|powershell|cmd\.exe)'
+tags: [web-exploit]
+alert: true

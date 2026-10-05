@@ -1,0 +1,15 @@
+id: http-sqli-014
+title: SQL injection probe
+description: Classic SQL injection syntax observed in a request path or query string.
+attack: T1190
+attack_name: Exploit Public-Facing Application
+severity: high
+enabled: true
+match:
+  service: http
+match_any:
+  - path|re: '(union[+\s]+(all[+\s]+)?select|or[+\s]+.{0,3}1.{0,3}[+\s]*=[+\s]*.{0,3}1|information_schema|sleep\([0-9]+\)|benchmark\(|extractvalue\(|updatexml\()'
+  - query|re: '(union[+\s]+(all[+\s]+)?select|or[+\s]+.{0,3}1.{0,3}[+\s]*=[+\s]*.{0,3}1|information_schema|sleep\([0-9]+\)|benchmark\(|extractvalue\(|updatexml\()'
+  - body_snippet|re: '(union[+\s]+(all[+\s]+)?select|or[+\s]+.{0,3}1.{0,3}[+\s]*=[+\s]*.{0,3}1|information_schema|sleep\([0-9]+\)|benchmark\(|extractvalue\(|updatexml\()'
+tags: [web-exploit]
+alert: true

@@ -1,0 +1,25 @@
+id: ssh-recon-cmds-006
+title: Host and system reconnaissance commands
+description: Discovery commands used to fingerprint the host after obtaining a session.
+attack: T1082
+attack_name: System Information Discovery
+severity: medium
+enabled: true
+match:
+  service: ssh
+  event_type: command
+  command|startswith:
+    - uname
+    - ifconfig
+    - netstat
+    - cat /etc/passwd
+    - cat /proc
+    - df
+    - free
+    - uptime
+    - hostnamectl
+    - ls -l
+    - ps aux
+    - ip a
+tags: [recon, discovery]
+alert: false

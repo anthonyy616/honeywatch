@@ -1,0 +1,21 @@
+id: ssh-busybox-009
+title: BusyBox or Mirai-like shell probe
+description: BusyBox/ToyBox applet probing and known IoT botnet strings in an SSH command.
+attack: T1059.004
+attack_name: Unix Shell
+severity: high
+enabled: true
+match:
+  service: ssh
+  event_type: command
+  command|contains:
+    - busybox
+    - toybox
+    - mirai
+    - gafgyt
+    - hajime
+    - tsunami
+    - dvrHelper
+    - zollard
+tags: [busybox-probe, post-compromise]
+alert: true

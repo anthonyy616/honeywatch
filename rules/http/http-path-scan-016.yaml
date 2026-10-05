@@ -1,0 +1,18 @@
+id: http-path-scan-016
+title: Rapid distinct path scanning
+description: Fifteen or more distinct paths requested from one source IP within 30 seconds.
+attack: T1595.003
+attack_name: Wordlist Scanning
+severity: medium
+enabled: true
+match:
+  service: http
+  event_type: http_request
+threshold:
+  group_by: src_ip
+  distinct:
+    field: path
+    count: 15
+  window: 30s
+tags: [scanner, recon]
+alert: false

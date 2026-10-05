@@ -1,0 +1,16 @@
+id: ssh-bruteforce-001
+title: SSH brute force attempts
+description: Ten or more SSH password attempts from one source IP within 60 seconds.
+attack: T1110.001
+attack_name: Password Guessing
+severity: high
+enabled: true
+match:
+  service: ssh
+  event_type: login_attempt
+threshold:
+  group_by: src_ip
+  count: 10
+  window: 60s
+tags: [brute-force, credential-access]
+alert: true

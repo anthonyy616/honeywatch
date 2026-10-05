@@ -1,0 +1,26 @@
+id: http-sensitive-path-010
+title: Sensitive path probing
+description: Requests for exposed configuration, credential or administrative paths.
+attack: T1595.003
+attack_name: Wordlist Scanning
+severity: medium
+enabled: true
+match:
+  service: http
+  event_type: http_request
+  path|contains:
+    - /.env
+    - /.git
+    - /wp-login.php
+    - /wp-admin
+    - /wp-config
+    - /phpmyadmin
+    - /config.php
+    - /.aws
+    - /actuator
+    - /server-status
+    - /vendor/phpunit
+    - /cgi-bin/
+    - /backup
+tags: [scanner, recon]
+alert: false

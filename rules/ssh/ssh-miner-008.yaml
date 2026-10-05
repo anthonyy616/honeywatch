@@ -1,0 +1,24 @@
+id: ssh-miner-008
+title: Cryptocurrency mining indicators
+description: Miner binaries, mining pool protocols or donation flags referenced in a command.
+attack: T1496
+attack_name: Resource Hijacking
+severity: high
+enabled: true
+match:
+  service: ssh
+  event_type: command
+  command|contains:
+    - stratum+tcp
+    - stratum+ssl
+    - xmrig
+    - minerd
+    - cpuminer
+    - ethminer
+    - nicehash
+    - nanopool
+    - supportxmr
+    - --donate-level
+    - monero
+tags: [resource-hijacking, post-compromise]
+alert: true

@@ -1,0 +1,12 @@
+id: ssh-login-success-004
+title: Honeypot accepted a fake login
+description: The honeypot intentionally accepted credentials. This is a controlled emulation decision, not evidence of a real compromise.
+attack: T1078
+attack_name: Valid Accounts
+severity: high
+enabled: true
+match:
+  service: ssh
+  event_type: login_success
+tags: [login-success, post-compromise]
+alert: true

@@ -1,0 +1,18 @@
+id: ssh-spray-002
+title: SSH credential spraying
+description: Eight or more distinct usernames attempted from one source IP within 300 seconds.
+attack: T1110.003
+attack_name: Password Spraying
+severity: high
+enabled: true
+match:
+  service: ssh
+  event_type: login_attempt
+threshold:
+  group_by: src_ip
+  distinct:
+    field: username
+    count: 8
+  window: 300s
+tags: [credential-spray, credential-access]
+alert: true

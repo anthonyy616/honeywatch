@@ -1,0 +1,13 @@
+id: ssh-download-exec-005
+title: Payload download attempt in SSH session
+description: Attacker tried to fetch a remote file with wget, curl, tftp or ftpget. The URL is recorded and never contacted.
+attack: T1105
+attack_name: Ingress Tool Transfer
+severity: critical
+enabled: true
+match:
+  service: ssh
+  event_type: command
+  command|re: '\b(wget|curl|tftp|ftpget)\b[^;|&]{0,400}(https?|ftp|tftp)://'
+tags: [malware-dropper, tool-transfer, post-compromise]
+alert: true

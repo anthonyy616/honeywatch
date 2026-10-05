@@ -1,0 +1,17 @@
+id: cross-multi-service-017
+title: Same source probes multiple exposed services
+description: Two or more distinct services (SSH and HTTP) contacted by one source IP within 10 minutes, indicating cross-service reconnaissance.
+attack: T1595
+attack_name: Active Scanning
+severity: medium
+enabled: true
+match:
+  service|re: '^(ssh|http)$'
+threshold:
+  group_by: src_ip
+  distinct:
+    field: service
+    count: 2
+  window: 10m
+tags: [scanner, recon]
+alert: false

@@ -1,0 +1,12 @@
+id: http-scanner-ua-011
+title: Known scanner user agent
+description: Requests identifying a vulnerability scanner, crawler or mass-probe tool.
+attack: T1595.002
+attack_name: Vulnerability Scanning
+severity: medium
+enabled: true
+match:
+  service: http
+  user_agent|re: '(nuclei|sqlmap|nikto|masscan|zgrab|acunetix|nessus|openvas|w3af|dirbuster|gobuster|feroxbuster|arachni|whatweb|joomscan|wpscan)'
+tags: [scanner, recon]
+alert: false
