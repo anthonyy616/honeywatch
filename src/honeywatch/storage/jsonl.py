@@ -36,7 +36,9 @@ class JsonlArchive:
         self.enabled = enabled
         self._handle: IO[str] | None = None
         self._current_day: str | None = None
-        self._lock = threading.Lock()
+        # Reentrant: ``write`` holds the lock while ``_open`` may call
+        # ``close`` (on a day rollover), which also takes the lock.
+        self._lock = threading.RLock()
         self.write_errors = 0
 
     # ---- lifecycle -----------------------------------------------------

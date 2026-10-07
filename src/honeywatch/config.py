@@ -36,7 +36,7 @@ class StrictModel(BaseModel):
 class SSHConfig(StrictModel):
     enabled: bool = True
     bind: str = "0.0.0.0"
-    port: int = Field(default=2222, ge=1, le=65535)
+    port: int = Field(default=2222, ge=0, le=65535)
     banner: str = DEFAULT_BANNER
     hostname: str = "srv-prod-02"
     accept_after_failures: int = Field(default=4, ge=1, le=1000)
@@ -67,7 +67,7 @@ class SSHConfig(StrictModel):
 class HTTPConfig(StrictModel):
     enabled: bool = True
     bind: str = "0.0.0.0"
-    port: int = Field(default=8080, ge=1, le=65535)
+    port: int = Field(default=8080, ge=0, le=65535)
     server_header: str = DEFAULT_SERVER_HEADER
     max_body_bytes: int = Field(default=8192, ge=0, le=1_048_576)
 

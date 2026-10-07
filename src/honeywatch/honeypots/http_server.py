@@ -296,6 +296,14 @@ class HTTPService:
         await self._site.start()
         logger.info("http honeypot listening on %s:%s", self.config.bind, self.config.port)
 
+    @property
+    def bound_port(self) -> int | None:
+        """The port actually listened on (differs from config when it is 0)."""
+        if self._runner is None:
+            return None
+        addresses = self._runner.addresses
+        return int(addresses[0][1]) if addresses else None
+
     async def stop(self) -> None:
         """Stop the listener and release the port."""
         if self._runner is not None:

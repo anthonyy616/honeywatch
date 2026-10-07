@@ -64,3 +64,5 @@ agent/*
 docs/*
 !docs/ARCHITECTURE.md
 !docs/EVENT_SCHEMA.md
+
+data/*

@@ -101,8 +101,9 @@ def run_doctor(config: Config) -> DoctorReport:
 
     # geoip
     geo_paths = [config.enrichment.geoip_city_db, config.enrichment.geoip_asn_db]
-    present = [Path(p) for p in geo_paths if p and Path(p).is_file()]
-    if len(present) == len([p for p in geo_paths if p]):
+    configured = [Path(p) for p in geo_paths if p]
+    present = [p for p in configured if p.is_file()]
+    if configured and len(present) == len(configured):
         checks.append(Check("geoip", "ok", f"{len(present)} database(s) present"))
     else:
         checks.append(

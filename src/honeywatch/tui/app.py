@@ -213,12 +213,20 @@ class HoneyWatchTUI(App[None]):
         Binding("4", "range_all", "All"),
     ]
 
-    def __init__(self, db_path: Path | str, *, refresh: float = 1.0, pipeline: Any = None) -> None:
+    def __init__(
+        self,
+        db_path: Path | str,
+        *,
+        refresh: float = 1.0,
+        pipeline: Any = None,
+        config: Any = None,
+    ) -> None:
         super().__init__()
         self.db_path = Path(db_path)
         self.refresh_interval = max(0.2, float(refresh))
         self.store = ReadStore(self.db_path)
         self.scorer = Scorer(self.store)
+        self.config = config
         self._load_rules()
         self.pipeline = pipeline
         self.paused = False
@@ -231,14 +239,17 @@ class HoneyWatchTUI(App[None]):
     # ---- setup ---------------------------------------------------------
 
     def _load_rules(self) -> None:
+        """Load rules from the injected config, falling back to the default one."""
         from ..config import ConfigError, load_config
         from ..engine.loader import load_ruleset
 
-        try:
-            config = load_config(None)
-        except ConfigError:
-            self.ruleset = None
-            return
+        config = self.config
+        if config is None:
+            try:
+                config = load_config(None)
+            except ConfigError:
+                self.ruleset = None
+                return
         self.ruleset = load_ruleset(config.rules_dir)
         self.scorer.load_rule_tags(self.ruleset.rules)
 
@@ -253,8 +264,12 @@ class HoneyWatchTUI(App[None]):
         yield DataTable(id="feed", cursor_type="row", zebra_stripes=True)
         yield Static(id="bottom")
         yield Footer()
+
+    def on_mount(self) -> None:
+        """Populate table headers and start polling once widgets exist."""
         self._setup_tables()
         self.set_interval(self.refresh_interval, self.poll)
+        self.poll()
 
     def _setup_tables(self) -> None:
         feed = self.query_one("#feed", DataTable)
@@ -272,6 +287,12 @@ class HoneyWatchTUI(App[None]):
 
     def poll(self) -> None:
         """Refresh widgets. Display-only; the daemon is never touched."""
+        if len(self.screen_stack) > 1:
+            # A modal or detail screen is on top. The dashboard is not visible,
+            # and ``query_one`` resolves against the *active* screen, so looking
+            # up its widgets here would raise ``NoMatches`` and take the whole
+            # app down with it on the next timer tick.
+            return
         if self.paused:
             self.query_one("#metrics", Static).update(self._metrics_text("PAUSED"))
             return
@@ -360,16 +381,37 @@ class HoneyWatchTUI(App[None]):
     def action_toggle_pause(self) -> None:
         self.paused = not self.paused
 
-    async def action_filter(self) -> None:
-        result = await self.push_screen_wait(FilterScreen())
-        self.filter_text = result.strip() or None if result else None
+    def action_filter(self) -> None:
+        self.push_screen(FilterScreen(), self._apply_filter)
+
+    def _apply_filter(self, result: str | None) -> None:
+        """Apply the filter chosen in the modal (``None`` clears it)."""
+        self.filter_text = (result.strip() or None) if result else None
+        # The buffered rows were selected under the previous filter; keeping
+        # them would leave filtered-out events on screen indefinitely.
+        self._reset_feed()
+        self.poll()
+
+    @on(DataTable.RowSelected, "#attackers")
+    def _on_attacker_row_selected(self, event: DataTable.RowSelected) -> None:
+        """Enter on the attacker table opens that attacker's detail view.
+
+        ``DataTable`` binds Enter itself and consumes it, so the app-level
+        ``enter`` binding below never sees the key while the table has focus.
+        """
+        event.stop()
+        self._open_attacker_row(event.cursor_row)
 
     def action_open_selected(self) -> None:
+        table = self.query_one("#attackers", DataTable)
+        self._open_attacker_row(table.cursor_row)
+
+    def _open_attacker_row(self, row_index: int) -> None:
         table = self.query_one("#attackers", DataTable)
         if table.row_count == 0:
             return
         try:
-            row = table.get_row_at(table.cursor_row)
+            row = table.get_row_at(row_index)
         except (IndexError, ValueError):  # pragma: no cover - empty table
             return
         self.push_screen(AttackerScreen(str(row[0]), self.store, self.scorer))
@@ -380,8 +422,8 @@ class HoneyWatchTUI(App[None]):
     def action_show_alerts(self) -> None:
         self.push_screen(AlertsScreen(self.store))
 
-    async def action_show_help(self) -> None:
-        await self.push_screen_wait(HelpScreen())
+    def action_show_help(self) -> None:
+        self.push_screen(HelpScreen())
 
     def action_export_selected(self) -> None:
         table = self.query_one("#attackers", DataTable)
@@ -407,10 +449,14 @@ class HoneyWatchTUI(App[None]):
             return
         self.notify(f"exported {target.name}")
 
-    def _set_range(self, label: str) -> None:
-        self.range_label = label
+    def _reset_feed(self) -> None:
+        """Drop buffered feed rows so the next poll rebuilds the view."""
         self.last_id = 0
         self.retained = []
+
+    def _set_range(self, label: str) -> None:
+        self.range_label = label
+        self._reset_feed()
 
     def action_range_15m(self) -> None:
         self._set_range(RANGE_KEYS["1"])

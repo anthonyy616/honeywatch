@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -24,7 +25,10 @@ NOW = datetime(2026, 3, 12, 12, 0, tzinfo=UTC)
 
 @pytest.fixture
 def offline(tmp_path: Path, rules_dir: Path):
-    config = parse_config({"data_dir": str(tmp_path / "data")}, base_dir=tmp_path)
+    config = parse_config(
+        {"data_dir": str(tmp_path / "data"), "rules": {"directory": str(rules_dir)}},
+        base_dir=tmp_path,
+    )
     pipeline, resources = build_offline_pipeline(config, db_path=tmp_path / "out.db")
     yield pipeline, config, resources
     for resource in resources:
@@ -178,8 +182,6 @@ def test_replay_is_deterministic(tmp_path: Path, rules_dir: Path) -> None:
     from honeywatch.replay import Replay
 
     source = tmp_path / "events.jsonl"
-    import json
-
     lines = []
     for index in range(12):
         event = make_event(
@@ -198,7 +200,11 @@ def test_replay_is_deterministic(tmp_path: Path, rules_dir: Path) -> None:
     for run in range(2):
         db = tmp_path / f"run{run}.db"
         pipeline, resources = build_offline_pipeline(
-            parse_config({"data_dir": str(tmp_path / "data")}, base_dir=tmp_path), db_path=db
+            parse_config(
+                {"data_dir": str(tmp_path / "data"), "rules": {"directory": str(rules_dir)}},
+                base_dir=tmp_path,
+            ),
+            db_path=db,
         )
 
         async def scenario() -> int:
@@ -228,9 +234,14 @@ def test_replay_skips_malformed_lines(tmp_path: Path, rules_dir: Path) -> None:
     from honeywatch.replay import Replay
 
     source = tmp_path / "mixed.jsonl"
-    source.write_text('{"nope": 1}\n' + make_event().to_json_dict().__repr__().replace("'", '"') + "\n", encoding="utf-8")
+    source.write_text(
+        '{"nope": 1}\n' + json.dumps(make_event().to_json_dict()) + "\n", encoding="utf-8"
+    )
     pipeline, resources = build_offline_pipeline(
-        parse_config({"data_dir": str(tmp_path / "data")}, base_dir=tmp_path),
+        parse_config(
+            {"data_dir": str(tmp_path / "data"), "rules": {"directory": str(rules_dir)}},
+            base_dir=tmp_path,
+        ),
         db_path=tmp_path / "m.db",
     )
 
@@ -267,36 +278,44 @@ def test_simulation_uses_documentation_ranges(offline) -> None:
     pipeline, _config, _resources = offline
     sim = Simulator(pipeline=pipeline, rate=0, seed=7)
 
-    async def scenario() -> int:
+    async def scenario() -> tuple[int, list[str]]:
         pipeline.start()
         count = await sim.run(profiles=("mirai-dropper",))
         await asyncio.wait_for(pipeline.queue.join(), timeout=30)
+        # Read before ``stop()`` closes storage for the last time.
+        rows = [
+            row[0]
+            for row in pipeline.storage.execute("SELECT DISTINCT src_ip FROM events").fetchall()
+        ]
         await pipeline.stop()
-        return count
+        return count, rows
 
-    count = asyncio.run(scenario())
+    count, rows = asyncio.run(scenario())
     assert count > 0
-    rows = pipeline.storage.execute("SELECT DISTINCT src_ip FROM events").fetchall()
     assert rows
-    for row in rows:
-        assert row[0].startswith(("192.0.2.", "198.51.100.", "203.0.113."))
+    for ip in rows:
+        assert ip.startswith(("192.0.2.", "198.51.100.", "203.0.113."))
 
 
 def test_simulation_produces_detections(offline) -> None:
     pipeline, _config, _resources = offline
     sim = Simulator(pipeline=pipeline, rate=0, seed=3)
 
-    async def scenario() -> None:
+    async def scenario() -> set[str]:
         pipeline.start()
         await sim.run(profiles=("ssh-bruteforcer", "web-scanner", "mirai-dropper"))
         await asyncio.wait_for(pipeline.queue.join(), timeout=30)
+        # Read before ``stop()`` closes storage for the last time.
+        rules = {
+            row[0]
+            for row in pipeline.storage.execute(
+                "SELECT DISTINCT rule_id FROM rule_hits"
+            ).fetchall()
+        }
         await pipeline.stop()
+        return rules
 
-    asyncio.run(scenario())
-    rules = {
-        row[0]
-        for row in pipeline.storage.execute("SELECT DISTINCT rule_id FROM rule_hits").fetchall()
-    }
+    rules = asyncio.run(scenario())
     assert {"ssh-bruteforce-001", "ssh-download-exec-005"} & rules
 
 
@@ -310,17 +329,25 @@ def test_unknown_profile_is_rejected(offline) -> None:
 # ---- doctor -------------------------------------------------------------
 
 
-def test_doctor_passes_on_fresh_config(tmp_path: Path) -> None:
+def test_doctor_passes_on_fresh_config(tmp_path: Path, rules_dir: Path) -> None:
     config = parse_config(
-        {"data_dir": str(tmp_path / "data"), "ssh": {"port": 0}, "http": {"port": 0}},
+        {
+            "data_dir": str(tmp_path / "data"),
+            "rules": {"directory": str(rules_dir)},
+            "ssh": {"port": 0},
+            "http": {"port": 0},
+        },
         base_dir=tmp_path,
     )
     report = run_doctor(config)
     assert report.ok, [c for c in report.checks if c.status == "fail"]
 
 
-def test_doctor_reports_missing_geoip_as_warning(tmp_path: Path) -> None:
-    config = parse_config({"data_dir": str(tmp_path / "data")}, base_dir=tmp_path)
+def test_doctor_reports_missing_geoip_as_warning(tmp_path: Path, rules_dir: Path) -> None:
+    config = parse_config(
+        {"data_dir": str(tmp_path / "data"), "rules": {"directory": str(rules_dir)}},
+        base_dir=tmp_path,
+    )
     report = run_doctor(config)
     geo = next(c for c in report.checks if c.name == "geoip")
     assert geo.status == "warn"

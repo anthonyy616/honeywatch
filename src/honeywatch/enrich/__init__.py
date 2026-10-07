@@ -45,18 +45,21 @@ def classify_address(ip: str) -> tuple[str, str | None]:
         return "invalid", None
     if addr.is_loopback:
         return "loopback", "LO"
-    if addr.is_private:
-        return "private", "LAN"
+    # Link-local, multicast, unspecified and documentation ranges are all
+    # reported as ``is_private`` by ``ipaddress``, so they must be checked
+    # before the generic private branch.
     if addr.is_link_local:
         return "reserved", "LL"
     if addr.is_multicast:
         return "reserved", "MC"
     if addr.is_unspecified:
         return "reserved", "UN"
-    if addr.version == 4 and addr in _DOCUMENTATION_V4:
+    if addr.version == 4 and any(addr in net for net in _DOCUMENTATION_V4):
         return "documentation", "DOC"
-    if addr.version == 6 and addr in _DOCUMENTATION_V6:
+    if addr.version == 6 and any(addr in net for net in _DOCUMENTATION_V6):
         return "documentation", "DOC"
+    if addr.is_private:
+        return "private", "LAN"
     return "public", None
 
 

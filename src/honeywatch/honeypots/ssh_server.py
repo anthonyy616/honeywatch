@@ -142,6 +142,7 @@ class SSHService:
                 session_id=handler.session_id,
                 username=safe_user or None,
                 password=safe_pass or None,
+                client_banner=handler.client_banner or None,
             )
         )
         if accepted:
@@ -175,25 +176,45 @@ class SSHService:
             )
         )
 
-    async def _serve_shell(self, handler: _SSHHandler, process: asyncssh.SSHServerProcess) -> bool:
+    async def _handle_process(self, process: asyncssh.SSHServerProcess) -> None:
+        """Serve one channel (interactive shell or ``ssh host 'cmd'``).
+
+        asyncssh passes only the process here, so the per-connection handler is
+        recovered from the owning connection. That keeps every command event
+        attributed to the right source IP, session ID and attempt count.
+        """
+        owner = process.channel.get_connection().get_owner()
+        if not isinstance(owner, _SSHHandler):  # pragma: no cover - defensive
+            process.exit(1)
+            return
+        await self._serve_shell(owner, process)
+
+    async def _serve_shell(self, handler: _SSHHandler, process: asyncssh.SSHServerProcess) -> None:
         """Serve the emulated shell, enforcing idle/session/command limits."""
         session = ShellSession(hostname=self.config.hostname, username="root")
         shell = FakeShell(session)
-        process.stdout.write(
-            "Welcome to Ubuntu 22.04.3 LTS (GNU/Linux 5.15.0-91-generic)\r\n"
-        )
+        command = process.command
         try:
-            await asyncio.wait_for(
-                self._pump(handler, process, shell, session),
-                timeout=self.config.session_timeout_s,
-            )
+            if command is not None:
+                # ``ssh host 'cmd'`` is the most common automated attacker form:
+                # a single command with no interactive prompt to wait for.
+                self._execute_line(
+                    handler, process, shell, session, command, interactive=False
+                )
+            else:
+                process.stdout.write(
+                    "Welcome to Ubuntu 22.04.3 LTS (GNU/Linux 5.15.0-91-generic)\r\n"
+                )
+                await asyncio.wait_for(
+                    self._pump(handler, process, shell, session),
+                    timeout=self.config.session_timeout_s,
+                )
         except (TimeoutError, asyncio.CancelledError):
             with contextlib.suppress(Exception):
                 process.stderr.write("\r\n[timed out]\r\n")
         finally:
             with contextlib.suppress(Exception):
                 process.exit(0)
-        return True
 
     async def _pump(
         self,
@@ -214,26 +235,44 @@ class SSHService:
             if not line:
                 return
             text = safe_text(line, limit=MAX_SSH_LINE)
-            if not text:
-                process.stdout.write(session.prompt())
-                continue
-
-            components = split_chain(text) or [text]
-            for component in components:
-                if session.commands_used >= self.config.max_commands:
-                    self._on_command(handler, text, blocked=True)
-                    process.stderr.write("-bash: maximum number of commands reached\r\n")
-                    return
-                self._on_command(handler, component)
-
-            output = shell.execute(text)
-            if output:
-                process.stdout.write(output.replace("\n", "\r\n") + "\r\n")
-            first = text.split()[0].rsplit("/", 1)[-1].casefold() if text.split() else ""
-            if first in {"exit", "logout"}:
-                process.stdout.write("logout\r\n")
+            if not self._execute_line(
+                handler, process, shell, session, text, interactive=True
+            ):
                 return
+
+    def _execute_line(
+        self,
+        handler: _SSHHandler,
+        process: asyncssh.SSHServerProcess,
+        shell: FakeShell,
+        session: ShellSession,
+        text: str,
+        *,
+        interactive: bool,
+    ) -> bool:
+        """Record one command line and answer it. Returns False to end the session."""
+        if not text:
             process.stdout.write(session.prompt())
+            return True
+
+        components = split_chain(text) or [text]
+        for component in components:
+            if session.commands_used >= self.config.max_commands:
+                self._on_command(handler, text, blocked=True)
+                process.stderr.write("-bash: maximum number of commands reached\r\n")
+                return False
+            self._on_command(handler, component)
+
+        output = shell.execute(text)
+        if output:
+            process.stdout.write(output.replace("\n", "\r\n") + "\r\n")
+        first = text.split()[0].rsplit("/", 1)[-1].casefold() if text.split() else ""
+        if first in {"exit", "logout"}:
+            process.stdout.write("logout\r\n")
+            return False
+        if interactive:
+            process.stdout.write(session.prompt())
+        return True
 
     # ---- lifecycle -----------------------------------------------------
 
@@ -245,17 +284,22 @@ class SSHService:
         """
         key = str(ensure_host_key(host_key_path))
         self._server = await asyncssh.create_server(
-            _SSHHandler,
+            lambda: _SSHHandler(self),
             self.config.bind,
             self.config.port,
-            server_factory=lambda: _SSHHandler(self),
             server_host_keys=[key],
+            process_factory=self._handle_process,
             server_version=self.banner,
             encoding="utf-8",
             errors="replace",
             login_timeout=self.config.idle_timeout_s,
         )
         logger.info("ssh honeypot listening on %s:%s", self.config.bind, self.config.port)
+
+    @property
+    def bound_port(self) -> int | None:
+        """The port actually listened on (differs from config when it is 0)."""
+        return int(self._server.get_port()) if self._server is not None else None
 
     async def stop(self) -> None:
         """Close the listener and release the port."""
@@ -275,6 +319,8 @@ class _SSHHandler(asyncssh.SSHServer):
         self.ip = "0.0.0.0"
         self.port: int | None = None
         self.attempts = 0
+        self.client_banner = ""
+        self._conn: asyncssh.SSHServerConnection | None = None
         self._tracked = False
 
     # ---- connection lifecycle -----------------------------------------
@@ -289,6 +335,7 @@ class _SSHHandler(asyncssh.SSHServer):
                 conn.abort()
             logger.info("ssh connection refused by limits from %s", self.ip)
             return
+        self._conn = conn
         self._tracked = True
         self.service._on_connect(
             self.ip,
@@ -298,6 +345,7 @@ class _SSHHandler(asyncssh.SSHServer):
         )
 
     def connection_lost(self, exc: Exception | None) -> None:
+        self._conn = None
         if self._tracked:
             self.service.limiter.release(self.ip)
             self.service._on_disconnect(self.ip, self.session_id)
@@ -307,6 +355,14 @@ class _SSHHandler(asyncssh.SSHServer):
 
     def begin_auth(self, username: str) -> bool:
         del username
+        # The client's identification string arrives after ``connection_made``,
+        # so this is the earliest point the banner can be read. It is recorded
+        # on the events that follow (see ``_on_password``).
+        if self._conn is not None and not self.client_banner:
+            self.client_banner = safe_text(
+                str(self._conn.get_extra_info("client_version", "") or ""),
+                limit=MAX_SSH_LINE,
+            )
         return True
 
     def password_auth_supported(self) -> bool:
@@ -320,11 +376,3 @@ class _SSHHandler(asyncssh.SSHServer):
 
     async def validate_password(self, username: str, password: str) -> bool:
         return await self.service._on_password(self, username, password)
-
-    # ---- session -------------------------------------------------------
-
-    def session_requested(self) -> object:
-        return asyncssh.UNKNOWN
-
-    async def shell_requested(self, process: asyncssh.SSHServerProcess) -> bool:
-        return await self.service._serve_shell(self, process)

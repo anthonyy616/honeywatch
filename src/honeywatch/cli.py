@@ -273,7 +273,7 @@ def doctor(ctx: typer.Context) -> None:
         colour = {"ok": typer.colors.GREEN, "warn": typer.colors.YELLOW, "fail": typer.colors.RED}[
             check.status
         ]
-        typer.echo(f"[{check.status.upper():<4}] {check.name}: {check.detail}", fg=colour)
+        typer.secho(f"[{check.status.upper():<4}] {check.name}: {check.detail}", fg=colour)
     if not result.ok:
         raise typer.Exit(EXIT_FAILURE)
     typer.secho("all required checks passed", fg=typer.colors.GREEN)
@@ -333,16 +333,20 @@ def tui(
 ) -> None:
     """Open the read-only Textual dashboard."""
     cfg = current_config(ctx)
-    from .tui.app import HoneyWatchTUI, run_tui
-    from .tui.run import TUIOptions
+    from .tui.run import TUIOptions, run_tui
 
-    options = TUIOptions(db_path=db or cfg.db_path, replay=replay_file, speed=speed, refresh=refresh)
+    options = TUIOptions(
+        db_path=db or cfg.db_path,
+        replay=replay_file,
+        speed=speed,
+        refresh=refresh,
+        config=cfg,
+    )
     try:
         run_tui(options)
     except FileNotFoundError as exc:
         typer.secho(str(exc), fg=typer.colors.RED, err=True)
         raise typer.Exit(EXIT_CONFIG) from exc
-    del HoneyWatchTUI
 
 
 def _parse_duration_seconds(value: str) -> int:

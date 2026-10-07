@@ -13,11 +13,26 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from ..models import iso
+from ..models import Event, iso
 
 MAX_FEED_ROWS = 300
 MAX_TABLE_ROWS = 20
 MAX_SPARKLINE_BUCKETS = 60
+
+
+def _row_summary(data: dict[str, Any]) -> str:
+    """Rebuild the display summary for a stored event row.
+
+    ``summary`` is a derived presentation value (see docs/EVENT_SCHEMA.md),
+    not a stored column, so it is recomputed from the row using the same
+    rules the pipeline uses for live events.
+    """
+    try:
+        payload = dict(data)
+        payload["tags"] = [tag for tag in (payload.get("tags") or "").split(",") if tag]
+        return Event.model_validate(payload).summary()
+    except (ValueError, TypeError):  # pragma: no cover - defensive
+        return str(data.get("event_type") or "")
 
 
 @dataclass(slots=True)
@@ -132,7 +147,7 @@ class ReadStore:
             path=data["path"],
             http_method=data["http_method"],
             severity=data["severity"],
-            summary=data["summary"],
+            summary=_row_summary(data),
         )
 
     # ---- dashboard -----------------------------------------------------

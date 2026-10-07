@@ -277,13 +277,12 @@ def test_empty_database_is_safe(tmp_path: Path) -> None:
         assert read.alerts() == []
 
 
-def test_storage_error_is_raised_loudly(tmp_path: Path, monkeypatch) -> None:
+def test_storage_error_is_raised_loudly(tmp_path: Path) -> None:
     store = Storage(tmp_path / "s.db")
-
-    def boom(*_args, **_kwargs):
-        raise sqlite3.OperationalError("disk I/O error")
-
-    monkeypatch.setattr(store._conn, "execute", boom)  # noqa: SLF001
+    # ``sqlite3.Connection.execute`` is a read-only C slot and cannot be
+    # monkeypatched, so surface a real sqlite3.Error by closing the
+    # connection. Any sqlite3.Error from a write must become a StorageError.
+    store.close()
     with pytest.raises(StorageError):
         store.insert_event(make_event())
 
