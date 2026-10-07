@@ -118,7 +118,8 @@ traffic through the same pipeline the honeypots use.
 
 ```bash
 honeywatch simulate \
-  --profile ssh-bruteforcer,credential-sprayer \
+  --profile ssh-bruteforcer \
+  --profile credential-sprayer \
   --rate 3 \
   --duration 30s
 ```
@@ -143,7 +144,7 @@ Useful profile combinations for a demo:
 You can make the demo more deterministic by fixing the seed:
 
 ```bash
-honeywatch simulate --profile ssh-bruteforcer,credential-sprayer --rate 3 --duration 30s --seed 42
+honeywatch simulate --profile ssh-bruteforcer --profile credential-sprayer --rate 3 --duration 30s --seed 42
 ```
 
 ## 6. Inspect the database

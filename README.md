@@ -65,7 +65,7 @@ A convincing local demo usually goes like this:
 
 ```bash
 honeywatch doctor
-honeywatch simulate --profile ssh-bruteforcer,<span data-diff-start="0"></span>credential-sprayer<span data-diff-end="0"></span> --rate 3 --duration 30s
+honeywatch simulate --profile ssh-bruteforcer --profile credential-sprayer --rate 3 --duration 30s
 honeywatch db stats
 honeywatch report --since 30m
 honeywatch tui
