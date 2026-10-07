@@ -65,7 +65,7 @@ A convincing local demo usually goes like this:
 
 ```bash
 honeywatch doctor
-honeywatch simulate --profile ssh-bruteforcer,web-scanner --rate 3 --duration 30s
+honeywatch simulate --profile ssh-bruteforcer,<span data-diff-start="0"></span>credential-sprayer<span data-diff-end="0"></span> --rate 3 --duration 30s
 honeywatch db stats
 honeywatch report --since 30m
 honeywatch tui
@@ -74,6 +74,14 @@ honeywatch tui
 `simulate` generates traffic through the same pipeline the honeypots use, so it
 is useful for profiling, testing and demoing without needing real attacker
 traffic.
+
+
+## Real-world example
+
+If you want a reproducible demo you can see, start with docs/REAL_WORLD_EXAMPLE.md.
+
+That walkthrough covers the full path from install through validation, simulation, dashboard inspection, replay, reporting and cleanup.
+
 
 ## Commands
 

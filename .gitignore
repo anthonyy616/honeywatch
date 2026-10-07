@@ -64,5 +64,6 @@ agent/*
 docs/*
 !docs/ARCHITECTURE.md
 !docs/EVENT_SCHEMA.md
+!docs/REAL_WORLD_EXAMPLE.md
 
 data/*
