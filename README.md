@@ -160,7 +160,7 @@ python -m build
 
 ## **Live Version of the TUI**
 
-![alt text](2026-10-07_14-43-50.png)
+![alt text](image.png)
 
 ## Configuration
 
